@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Letterhead Header Studio</title>
+<title>Letterhead Studio — Header · Footer · Signature</title>
 <style>
   :root{
     --bg:#f3f5f8; --panel:#ffffff; --border:#dde3ea; --text:#1c2530;
@@ -12,14 +12,17 @@
   *{box-sizing:border-box; margin:0; padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden;}
   header.app{display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--border); flex-wrap:wrap;}
-  header.app h1{font-size:15px; font-weight:700; margin-right:8px; white-space:nowrap;}
+  header.app h1{font-size:15px; font-weight:700; margin-right:4px; white-space:nowrap;}
   header.app .grow{flex:1;}
+  .tabs{display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden;}
+  .tabs button{border:0; background:#fff; padding:7px 14px; font-size:13px; cursor:pointer; border-right:1px solid var(--border); color:var(--text);}
+  .tabs button:last-child{border-right:0;}
+  .tabs button.on{background:var(--accent); color:#fff; font-weight:600;}
   .btn{border:1px solid var(--border); background:#fff; color:var(--text); border-radius:7px; padding:7px 12px; font-size:13px; cursor:pointer; white-space:nowrap;}
   .btn:hover{border-color:#b9c3cf; background:#f8fafc;}
   .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600;}
   .btn.primary:hover{background:var(--accent2);}
   .btn.danger{color:var(--danger);}
-  .btn:disabled{opacity:.45; cursor:not-allowed;}
   select,input[type=text],input[type=number]{border:1px solid var(--border); border-radius:7px; padding:6px 8px; font-size:13px; background:#fff; color:var(--text);}
   label.inline{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; white-space:nowrap;}
   main{flex:1; display:flex; min-height:0;}
@@ -27,7 +30,7 @@
   #stage{position:relative; align-self:flex-start;}
   canvas#preview{background:#fff; box-shadow:0 2px 14px rgba(20,40,70,.18); border-radius:2px; display:block; touch-action:none;}
   #dropHint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; color:#9aa6b3; font-size:14px; text-align:center; line-height:1.6;}
-  aside{width:300px; min-width:300px; background:var(--panel); border-left:1px solid var(--border); overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:16px;}
+  aside{width:300px; min-width:300px; background:var(--panel); border-left:1px solid var(--border); overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:14px;}
   aside h2{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:8px;}
   .group{border:1px solid var(--border); border-radius:10px; padding:12px;}
   .row{display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;}
@@ -48,7 +51,7 @@
   .savedItem button{border:0; background:none; cursor:pointer; color:var(--accent); font-size:12px;}
   .savedItem button.del{color:var(--danger);}
   .empty{font-size:12px; color:var(--muted); font-style:italic;}
-  footer.app{padding:6px 16px; font-size:11.5px; color:var(--muted); background:var(--panel); border-top:1px solid var(--border); display:flex; gap:16px; flex-wrap:wrap;}
+  footer.app{padding:6px 16px; font-size:11.5px; color:var(--muted); background:var(--panel); border-top:1px solid var(--border);}
   #toast{position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#222d3a; color:#fff; padding:9px 16px; border-radius:8px; font-size:13px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:50;}
   #toast.show{opacity:1;}
 </style>
@@ -56,7 +59,12 @@
 <body>
 
 <header class="app">
-  <h1>Letterhead Header Studio</h1>
+  <h1>Letterhead Studio</h1>
+  <div class="tabs" id="tabs">
+    <button data-mode="header" class="on">Header</button>
+    <button data-mode="footer">Footer</button>
+    <button data-mode="signature">Signature</button>
+  </div>
   <button class="btn primary" id="btnUpload">Upload image</button>
   <input type="file" id="fileInput" accept="image/*" hidden>
   <button class="btn" id="btnAddText">+ Add text</button>
@@ -75,22 +83,38 @@
   </label>
   <span class="grow"></span>
   <button class="btn" id="btnNew">New</button>
-  <button class="btn primary" id="btnExport">Download header JPEG</button>
+  <button class="btn primary" id="btnExport">Download JPEG</button>
 </header>
 
 <main>
   <div id="stageWrap">
     <div id="stage">
       <canvas id="preview"></canvas>
-      <div id="dropHint">Upload or drag an image here to begin.<br>Drag elements to position them.<br>Drag the red line to set where the header is cut.</div>
+      <div id="dropHint"></div>
     </div>
   </div>
 
   <aside>
-    <div class="group">
-      <h2>Header cut</h2>
+    <div class="group" id="sigPanel" style="display:none">
+      <h2>Signatures</h2>
       <div class="row">
-        <label>Height</label>
+        <label>Count</label>
+        <select id="sigCount">
+          <option>1</option><option>2</option><option selected>3</option>
+          <option>4</option><option>5</option><option>6</option>
+        </select>
+        <button class="btn" id="btnSigArrange">Auto-arrange</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnSigLabels">Add name labels</button>
+      </div>
+      <div class="hint">Page width is divided into the chosen number of columns. Upload one signature image per column — each is auto-sized to fit its column.</div>
+    </div>
+
+    <div class="group">
+      <h2 id="cutTitle">Header cut</h2>
+      <div class="row">
+        <label id="cutLabel">Height</label>
         <input type="range" id="cutRange" min="10" max="150" step="0.5">
         <input type="number" id="cutNum" min="10" max="150" step="0.5"> <span class="hint">mm</span>
       </div>
@@ -108,9 +132,14 @@
         <label>X</label><input type="number" id="imgX" step="0.5"> <span class="hint">mm</span>
         <label>Y</label><input type="number" id="imgY" step="0.5"> <span class="hint">mm</span>
       </div>
-      <div class="row">
+      <div class="row" id="imgFitRow">
         <button class="btn" id="btnImgFullWidth">Fit full page width</button>
         <button class="btn" id="btnImgCenter">Center horizontally</button>
+      </div>
+      <div class="row" id="imgColRow" style="display:none">
+        <button class="btn" id="btnFitColumn">Fit to column</button>
+        <label style="min-width:0">Column</label>
+        <select id="imgCol"></select>
       </div>
       <div class="row">
         <button class="btn" id="btnReplaceImg">Replace</button>
@@ -152,19 +181,19 @@
     </div>
 
     <div class="group">
-      <h2>Session designs</h2>
+      <h2 id="savedTitle">Session designs</h2>
       <div class="row">
         <input type="text" id="designName" placeholder="Design name…" style="flex:1">
         <button class="btn" id="btnSave">Save</button>
       </div>
       <div id="savedList"><div class="empty">Nothing saved this session.</div></div>
-      <div class="hint" style="margin-top:8px">Stored in this tab's session memory only. Closing the tab clears everything. No data leaves your browser.</div>
+      <div class="hint" style="margin-top:8px">Each tab keeps its own designs, in this tab's session memory only. Closing the tab clears everything. No data leaves your browser.</div>
     </div>
   </aside>
 </main>
 
 <footer class="app">
-  <span>Tips: drag to move · corner handle resizes image · double-click empty page to add text · arrow keys nudge (Shift = 5 mm) · Delete removes selected text</span>
+  Tips: drag to move · corner handle resizes image · double-click empty page to add text · arrow keys nudge (Shift = 5 mm) · Delete removes selected item
 </footer>
 
 <div id="toast"></div>
@@ -176,211 +205,262 @@
 /* ---------- constants ---------- */
 const PAGES = { a4:{w:210,h:297,label:"A4"}, letter:{w:215.9,h:279.4,label:"Letter"} };
 const PT2MM = 25.4/72;
-const DPR = 2;                       // internal supersampling for crisp preview
-const SS_AUTOSAVE = "lhs_autosave";
-const SS_DESIGNS  = "lhs_designs";
+const DPR = 2;
+const MODES = ["header","footer","signature"];
+const HINTS = {
+  header:"Upload or drag an image here to begin.<br>Drag elements to position them.<br>Drag the red line to set where the header is cut.",
+  footer:"Design your footer at the bottom of the page.<br>Upload or drag an image — it lands at the bottom.<br>Drag the red line to set the footer height.",
+  signature:"Set the signature count, then upload one image per column.<br>Each signature is auto-sized to its column.<br>Drag the red line to set the strip height."
+};
 
 /* ---------- state ---------- */
-let state = freshState();
-let imgEl = null;                    // decoded Image for state.image.src
-let selection = null;                // {type:'image'} | {type:'text', id}
-let ppm = 3;                         // internal canvas px per mm (preview)
-
-function freshState(){
+function freshState(mode){
   return {
-    pageSize:"a4",
-    dpi:300,
-    cutMm:45,
-    image:null,                      // {src,x,y,w, natW,natH}
-    texts:[],                        // {id,text,x,y,sizePt,color,bold,italic,align,font}
+    mode, pageSize:"a4", dpi:300,
+    cutMm: mode==="footer" ? 30 : mode==="signature" ? 40 : 45,
+    sigCount: 3,
+    images:[],            // {src,natW,natH,x,y,w,col}
+    texts:[],             // {id,text,x,y,sizePt,color,bold,italic,align,font}
     _seq:1
   };
 }
+const stores = {};
+MODES.forEach(m=> stores[m]=freshState(m));
+let mode = "header";
+let state = stores[mode];
+let selection = null;     // {type:'image', idx} | {type:'text', id}
+let ppm = 3;
+
 const page = () => PAGES[state.pageSize];
+const isFooter = () => mode==="footer";
+const isSig = () => mode==="signature";
+const lineY = () => isFooter() ? page().h - state.cutMm : state.cutMm;   // cut line position in mm
+const ssKey = (base,m) => base + "_" + (m||mode);
+
+/* ---------- image element cache ---------- */
+const imgCache = Object.create(null);
+function getImgEl(src){
+  let el = imgCache[src];
+  if(!el){ el = new Image(); el.onload = ()=>draw(); el.src = src; imgCache[src]=el; }
+  return el;
+}
 
 /* ---------- elements ---------- */
 const $ = id => document.getElementById(id);
 const cv = $("preview"), ctx = cv.getContext("2d");
 const stageWrap = $("stageWrap"), dropHint = $("dropHint");
 
-/* ---------- geometry helpers ---------- */
-function textFontPx(t, k){ return t.sizePt * PT2MM * k; }
+/* ---------- geometry ---------- */
+function textFontPx(t,k){ return t.sizePt*PT2MM*k; }
+function fontString(t,k){ return (t.italic?"italic ":"")+(t.bold?"700 ":"400 ")+textFontPx(t,k)+"px "+t.font; }
 function textLines(t){ return String(t.text).split("\n"); }
-function measureText(t, k, c){
-  c.font = fontString(t, k);
-  const lines = textLines(t);
-  const lh = textFontPx(t,k)*1.28;
-  let w = 0; for(const ln of lines) w = Math.max(w, c.measureText(ln).width);
-  return {w, h: lh*lines.length, lh};
-}
-function fontString(t, k){
-  return (t.italic?"italic ":"") + (t.bold?"700 ":"400 ") + textFontPx(t,k) + "px " + t.font;
+function measureTextMm(t){
+  ctx.font = fontString(t,1);
+  const lines = textLines(t), lh = textFontPx(t,1)*1.28;
+  let w=0; for(const ln of lines) w=Math.max(w, ctx.measureText(ln).width);
+  return {w, h:lh*lines.length};
 }
 function textBBoxMm(t){
-  const m = measureText(t, 1, ctx); // k=1 → px == mm
-  let x0 = t.x;
-  if(t.align==="center") x0 = t.x - m.w/2;
-  if(t.align==="right")  x0 = t.x - m.w;
-  return {x:x0, y:t.y, w:m.w, h:m.h};
+  const m = measureTextMm(t);
+  let x0=t.x;
+  if(t.align==="center") x0=t.x-m.w/2;
+  if(t.align==="right")  x0=t.x-m.w;
+  return {x:x0,y:t.y,w:m.w,h:m.h};
 }
-function imgBBoxMm(){
-  const im = state.image; if(!im) return null;
-  const h = im.w * (im.natH/im.natW);
-  return {x:im.x, y:im.y, w:im.w, h};
-}
+function imgBBoxMm(im){ return {x:im.x, y:im.y, w:im.w, h:im.w*(im.natH/im.natW)}; }
 
-/* ---------- rendering (shared by preview & export) ---------- */
-function renderScene(c, k){          // k = px per mm on target context
-  const p = page();
-  c.fillStyle = "#ffffff";
-  c.fillRect(0,0,p.w*k,p.h*k);
-  if(state.image && imgEl && imgEl.complete){
-    const b = imgBBoxMm();
-    c.drawImage(imgEl, b.x*k, b.y*k, b.w*k, b.h*k);
+/* ---------- rendering (shared preview/export) ---------- */
+function renderScene(c,k){
+  const p=page();
+  c.fillStyle="#fff"; c.fillRect(0,0,p.w*k,p.h*k);
+  for(const im of state.images){
+    const el=getImgEl(im.src);
+    if(el.complete && el.naturalWidth){ const b=imgBBoxMm(im); c.drawImage(el,b.x*k,b.y*k,b.w*k,b.h*k); }
   }
-  c.textBaseline = "top";
+  c.textBaseline="top";
   for(const t of state.texts){
-    c.font = fontString(t, k);
-    c.fillStyle = t.color;
-    c.textAlign = t.align;
-    const lh = textFontPx(t,k)*1.28;
-    textLines(t).forEach((ln,i)=> c.fillText(ln, t.x*k, (t.y*k)+i*lh));
+    c.font=fontString(t,k); c.fillStyle=t.color; c.textAlign=t.align;
+    const lh=textFontPx(t,k)*1.28;
+    textLines(t).forEach((ln,i)=> c.fillText(ln, t.x*k, t.y*k+i*lh));
   }
 }
 
 function draw(){
-  const p = page();
-  const availW = Math.min(stageWrap.clientWidth - 48, 760);
-  const cssW = Math.max(320, availW);
-  const cssH = cssW * p.h/p.w;
-  cv.style.width = cssW+"px"; cv.style.height = cssH+"px";
-  cv.width = Math.round(cssW*DPR); cv.height = Math.round(cssH*DPR);
-  ppm = cv.width / p.w;
+  const p=page();
+  const cssW = Math.max(320, Math.min(stageWrap.clientWidth-48, 760));
+  const cssH = cssW*p.h/p.w;
+  cv.style.width=cssW+"px"; cv.style.height=cssH+"px";
+  cv.width=Math.round(cssW*DPR); cv.height=Math.round(cssH*DPR);
+  ppm = cv.width/p.w;
 
   renderScene(ctx, ppm);
 
-  /* dim area below cut */
-  const cy = state.cutMm*ppm;
-  ctx.fillStyle = "rgba(120,130,145,.18)";
-  ctx.fillRect(0, cy, cv.width, cv.height-cy);
+  const ly = lineY()*ppm;
+
+  /* dim the discarded region */
+  ctx.fillStyle="rgba(120,130,145,.18)";
+  if(isFooter()) ctx.fillRect(0,0,cv.width,ly);
+  else ctx.fillRect(0,ly,cv.width,cv.height-ly);
+
+  /* signature column guides inside the strip */
+  if(isSig()){
+    ctx.save();
+    ctx.strokeStyle="#9db5d4"; ctx.lineWidth=1*DPR; ctx.setLineDash([6,6]);
+    const colW=p.w/state.sigCount;
+    for(let i=1;i<state.sigCount;i++){
+      const x=colW*i*ppm;
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,state.cutMm*ppm); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.fillStyle="#9db5d4"; ctx.font=(9*DPR)+"px Arial"; ctx.textAlign="left"; ctx.textBaseline="top";
+    for(let i=0;i<state.sigCount;i++) ctx.fillText(String(i+1), (colW*i+1.5)*ppm, 1.5*ppm);
+    ctx.restore();
+  }
 
   /* cut line */
   ctx.save();
-  ctx.strokeStyle = "#e03131"; ctx.lineWidth = 2*DPR; ctx.setLineDash([10,7]);
-  ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(cv.width,cy); ctx.stroke();
+  ctx.strokeStyle="#e03131"; ctx.lineWidth=2*DPR; ctx.setLineDash([10,7]);
+  ctx.beginPath(); ctx.moveTo(0,ly); ctx.lineTo(cv.width,ly); ctx.stroke();
   ctx.setLineDash([]);
-  /* cut handle + label */
-  ctx.fillStyle = "#e03131";
-  const hw = 46*DPR, hh = 17*DPR;
-  roundRect(ctx, cv.width-hw-6*DPR, cy-hh/2, hw, hh, 4*DPR); ctx.fill();
-  ctx.fillStyle="#fff"; ctx.font = (10*DPR)+"px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.fillText(state.cutMm.toFixed(1)+" mm", cv.width-hw/2-6*DPR, cy);
+  ctx.fillStyle="#e03131";
+  const hw=46*DPR, hh=17*DPR;
+  roundRect(ctx, cv.width-hw-6*DPR, ly-hh/2, hw, hh, 4*DPR); ctx.fill();
+  ctx.fillStyle="#fff"; ctx.font=(10*DPR)+"px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(state.cutMm.toFixed(1)+" mm", cv.width-hw/2-6*DPR, ly);
   ctx.restore();
 
-  /* selection outline */
+  /* selection */
   if(selection){
-    const b = selection.type==="image" ? imgBBoxMm() : textBBoxMm(getText(selection.id));
+    const b = selection.type==="image" ? (state.images[selection.idx] && imgBBoxMm(state.images[selection.idx]))
+                                       : (getText(selection.id) && textBBoxMm(getText(selection.id)));
     if(b){
       ctx.save();
-      ctx.strokeStyle = "#1267d2"; ctx.lineWidth = 1.5*DPR; ctx.setLineDash([6,4]);
-      ctx.strokeRect(b.x*ppm-3, b.y*ppm-3, b.w*ppm+6, b.h*ppm+6);
+      ctx.strokeStyle="#1267d2"; ctx.lineWidth=1.5*DPR; ctx.setLineDash([6,4]);
+      ctx.strokeRect(b.x*ppm-3,b.y*ppm-3,b.w*ppm+6,b.h*ppm+6);
       ctx.setLineDash([]);
       if(selection.type==="image"){
-        ctx.fillStyle="#1267d2";
-        const s = 9*DPR;
-        ctx.fillRect((b.x+b.w)*ppm-s/2, (b.y+b.h)*ppm-s/2, s, s);
+        ctx.fillStyle="#1267d2"; const s=9*DPR;
+        ctx.fillRect((b.x+b.w)*ppm-s/2,(b.y+b.h)*ppm-s/2,s,s);
       }
       ctx.restore();
     }
   }
-  dropHint.style.display = (state.image || state.texts.length) ? "none" : "flex";
+
+  dropHint.style.display = (state.images.length||state.texts.length) ? "none" : "flex";
   updateExportInfo();
 }
 function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
 
 /* ---------- interaction ---------- */
-let drag = null; // {mode:'image'|'text'|'cut'|'scale', id, dx, dy, startW, startX, startMouse}
+let drag=null;
 
 function mouseMm(e){
-  const r = cv.getBoundingClientRect();
+  const r=cv.getBoundingClientRect();
   return { x:(e.clientX-r.left)*(cv.width/r.width)/ppm,
            y:(e.clientY-r.top)*(cv.height/r.height)/ppm };
 }
 function hitTest(m){
-  const tolMm = 8/ (ppm/DPR);                       // ~8 css px in mm
-  if(Math.abs(m.y - state.cutMm) < tolMm) return {mode:"cut"};
-  if(selection && selection.type==="image" && state.image){
-    const b = imgBBoxMm();
-    if(Math.abs(m.x-(b.x+b.w))<tolMm && Math.abs(m.y-(b.y+b.h))<tolMm) return {mode:"scale"};
+  const tol = 8/(ppm/DPR);
+  if(Math.abs(m.y-lineY())<tol) return {kind:"cut"};
+  if(selection && selection.type==="image" && state.images[selection.idx]){
+    const b=imgBBoxMm(state.images[selection.idx]);
+    if(Math.abs(m.x-(b.x+b.w))<tol && Math.abs(m.y-(b.y+b.h))<tol) return {kind:"scale"};
   }
   for(let i=state.texts.length-1;i>=0;i--){
-    const t = state.texts[i], b = textBBoxMm(t);
-    if(m.x>=b.x-1 && m.x<=b.x+b.w+1 && m.y>=b.y-1 && m.y<=b.y+b.h+1) return {mode:"text", id:t.id};
+    const t=state.texts[i], b=textBBoxMm(t);
+    if(m.x>=b.x-1&&m.x<=b.x+b.w+1&&m.y>=b.y-1&&m.y<=b.y+b.h+1) return {kind:"text", id:t.id};
   }
-  if(state.image){
-    const b = imgBBoxMm();
-    if(m.x>=b.x && m.x<=b.x+b.w && m.y>=b.y && m.y<=b.y+b.h) return {mode:"image"};
+  for(let i=state.images.length-1;i>=0;i--){
+    const b=imgBBoxMm(state.images[i]);
+    if(m.x>=b.x&&m.x<=b.x+b.w&&m.y>=b.y&&m.y<=b.y+b.h) return {kind:"image", idx:i};
   }
   return null;
 }
 
 cv.addEventListener("pointerdown", e=>{
   cv.setPointerCapture(e.pointerId);
-  const m = mouseMm(e), h = hitTest(m);
+  const m=mouseMm(e), h=hitTest(m);
   if(!h){ select(null); return; }
-  if(h.mode==="cut"){ drag={mode:"cut"}; return; }
-  if(h.mode==="scale"){ drag={mode:"scale", startW:state.image.w, startX:m.x, imgX:state.image.x}; return; }
-  if(h.mode==="text"){ const t=getText(h.id); select({type:"text", id:h.id}); drag={mode:"text", id:h.id, dx:m.x-t.x, dy:m.y-t.y}; return; }
-  if(h.mode==="image"){ select({type:"image"}); drag={mode:"image", dx:m.x-state.image.x, dy:m.y-state.image.y}; }
+  if(h.kind==="cut"){ drag={mode:"cut"}; return; }
+  if(h.kind==="scale"){ const im=state.images[selection.idx]; drag={mode:"scale", idx:selection.idx, startW:im.w, startX:m.x}; return; }
+  if(h.kind==="text"){ const t=getText(h.id); select({type:"text",id:h.id}); drag={mode:"text",id:h.id,dx:m.x-t.x,dy:m.y-t.y}; return; }
+  if(h.kind==="image"){ const im=state.images[h.idx]; select({type:"image",idx:h.idx}); drag={mode:"image",idx:h.idx,dx:m.x-im.x,dy:m.y-im.y}; }
 });
 cv.addEventListener("pointermove", e=>{
-  const m = mouseMm(e);
+  const m=mouseMm(e);
   if(!drag){
-    const h = hitTest(m);
-    cv.style.cursor = !h ? "default" : h.mode==="cut" ? "ns-resize" : h.mode==="scale" ? "nwse-resize" : "move";
+    const h=hitTest(m);
+    cv.style.cursor = !h ? "default" : h.kind==="cut" ? "ns-resize" : h.kind==="scale" ? "nwse-resize" : "move";
     return;
   }
-  if(drag.mode==="cut"){ setCut(clamp(m.y, 10, page().h-10)); }
-  else if(drag.mode==="image"){ state.image.x = m.x-drag.dx; state.image.y = m.y-drag.dy; syncImagePanel(); }
-  else if(drag.mode==="scale"){
-    const w = clamp(drag.startW + (m.x-drag.startX), 5, page().w*2.5);
-    state.image.w = w; syncImagePanel();
+  if(drag.mode==="cut"){
+    const c = isFooter() ? page().h - m.y : m.y;
+    setCut(clamp(c, 10, Math.min(150, page().h-10)));
   }
-  else if(drag.mode==="text"){ const t=getText(drag.id); t.x = m.x-drag.dx; t.y = m.y-drag.dy; }
+  else if(drag.mode==="image"){ const im=state.images[drag.idx]; im.x=m.x-drag.dx; im.y=m.y-drag.dy; syncImagePanel(); }
+  else if(drag.mode==="scale"){ const im=state.images[drag.idx]; im.w=clamp(drag.startW+(m.x-drag.startX),5,page().w*2.5); syncImagePanel(); }
+  else if(drag.mode==="text"){ const t=getText(drag.id); t.x=m.x-drag.dx; t.y=m.y-drag.dy; }
   draw(); scheduleAutosave();
 });
-const endDrag = ()=>{ drag=null; };
-cv.addEventListener("pointerup", endDrag);
-cv.addEventListener("pointercancel", endDrag);
+const endDrag=()=>{drag=null;};
+cv.addEventListener("pointerup",endDrag);
+cv.addEventListener("pointercancel",endDrag);
 
 cv.addEventListener("dblclick", e=>{
-  const m = mouseMm(e);
+  const m=mouseMm(e);
   if(hitTest(m)) return;
-  addText(m.x, m.y);
+  addText(m.x,m.y);
 });
 
 document.addEventListener("keydown", e=>{
   if(["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName)) return;
   if(!selection) return;
-  const step = e.shiftKey?5:0.5;
-  const mv = (dx,dy)=>{
-    if(selection.type==="image"&&state.image){ state.image.x+=dx; state.image.y+=dy; syncImagePanel(); }
-    else if(selection.type==="text"){ const t=getText(selection.id); if(t){t.x+=dx; t.y+=dy;} }
+  const step=e.shiftKey?5:0.5;
+  const mv=(dx,dy)=>{
+    if(selection.type==="image"){ const im=state.images[selection.idx]; if(im){im.x+=dx; im.y+=dy; syncImagePanel();} }
+    else { const t=getText(selection.id); if(t){t.x+=dx; t.y+=dy;} }
     draw(); scheduleAutosave(); e.preventDefault();
   };
   if(e.key==="ArrowLeft") mv(-step,0);
   else if(e.key==="ArrowRight") mv(step,0);
   else if(e.key==="ArrowUp") mv(0,-step);
   else if(e.key==="ArrowDown") mv(0,step);
-  else if((e.key==="Delete"||e.key==="Backspace") && selection.type==="text"){ deleteText(selection.id); e.preventDefault(); }
+  else if(e.key==="Delete"||e.key==="Backspace"){
+    if(selection.type==="text") deleteText(selection.id);
+    else removeImage(selection.idx);
+    e.preventDefault();
+  }
 });
 
-/* drag & drop upload */
-["dragover","drop"].forEach(ev=> stageWrap.addEventListener(ev, e=>e.preventDefault()));
+["dragover","drop"].forEach(ev=> stageWrap.addEventListener(ev,e=>e.preventDefault()));
 stageWrap.addEventListener("drop", e=>{
-  const f = e.dataTransfer.files && e.dataTransfer.files[0];
-  if(f && f.type.startsWith("image/")) loadImageFile(f);
+  const f=e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(f&&f.type.startsWith("image/")) loadImageFile(f);
 });
+
+/* ---------- tabs ---------- */
+$("tabs").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  switchMode(b.dataset.mode);
+});
+function switchMode(m){
+  if(!MODES.includes(m)||m===mode) return;
+  mode=m; state=stores[m]; selection=null;
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.mode===m));
+  syncModeUI(); select(null); renderSaved(); draw();
+}
+function syncModeUI(){
+  $("pageSize").value=state.pageSize;
+  $("dpi").value=state.dpi;
+  setCut(state.cutMm);
+  $("sigPanel").style.display = isSig()?"":"none";
+  $("sigCount").value=state.sigCount;
+  $("cutTitle").textContent = mode[0].toUpperCase()+mode.slice(1)+" cut";
+  $("savedTitle").textContent = "Session designs — "+mode;
+  $("imgFitRow").style.display = isSig()?"none":"";
+  $("imgColRow").style.display = isSig()?"":"none";
+  dropHint.innerHTML = HINTS[mode];
+}
 
 /* ---------- image handling ---------- */
 $("btnUpload").onclick = ()=> $("fileInput").click();
@@ -388,217 +468,314 @@ $("btnReplaceImg").onclick = ()=> $("fileInput").click();
 $("fileInput").onchange = e=>{ if(e.target.files[0]) loadImageFile(e.target.files[0]); e.target.value=""; };
 
 function loadImageFile(file){
-  const rd = new FileReader();
-  rd.onload = ()=>{
-    const im = new Image();
-    im.onload = ()=>{
-      /* downscale very large images so sessionStorage stays within limits */
-      let src = rd.result, natW = im.naturalWidth, natH = im.naturalHeight;
-      const MAX = 3000;
-      if(natW>MAX || natH>MAX){
-        const s = MAX/Math.max(natW,natH);
-        const oc = document.createElement("canvas");
-        oc.width = Math.round(natW*s); oc.height = Math.round(natH*s);
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const im=new Image();
+    im.onload=()=>{
+      let src=rd.result, natW=im.naturalWidth, natH=im.naturalHeight;
+      const MAX=3000;
+      if(natW>MAX||natH>MAX){
+        const s=MAX/Math.max(natW,natH);
+        const oc=document.createElement("canvas");
+        oc.width=Math.round(natW*s); oc.height=Math.round(natH*s);
         oc.getContext("2d").drawImage(im,0,0,oc.width,oc.height);
-        src = (file.type==="image/png") ? oc.toDataURL("image/png") : oc.toDataURL("image/jpeg",0.92);
-        natW = oc.width; natH = oc.height;
+        src=(file.type==="image/png")?oc.toDataURL("image/png"):oc.toDataURL("image/jpeg",0.92);
+        natW=oc.width; natH=oc.height;
       }
-      const keepGeom = !!state.image;
-      const prev = state.image;
-      state.image = {
-        src, natW, natH,
-        w: keepGeom ? prev.w : page().w,
-        x: keepGeom ? prev.x : 0,
-        y: keepGeom ? prev.y : 0
-      };
-      setImgEl(src, ()=>{ select({type:"image"}); draw(); scheduleAutosave(); });
+      placeUploadedImage(src,natW,natH);
     };
-    im.src = rd.result;
+    im.src=rd.result;
   };
   rd.readAsDataURL(file);
 }
-function setImgEl(src, cb){
-  imgEl = new Image();
-  imgEl.onload = ()=>{ cb && cb(); draw(); };
-  imgEl.src = src;
-}
-$("btnRemoveImg").onclick = ()=>{ state.image=null; imgEl=null; select(null); draw(); scheduleAutosave(); };
-$("btnImgFullWidth").onclick = ()=>{ if(!state.image) return; state.image.w=page().w; state.image.x=0; syncImagePanel(); draw(); scheduleAutosave(); };
-$("btnImgCenter").onclick = ()=>{ if(!state.image) return; state.image.x=(page().w-state.image.w)/2; syncImagePanel(); draw(); scheduleAutosave(); };
-["imgW","imgWNum"].forEach(id=> $(id).addEventListener("input", e=>{
-  if(!state.image) return; state.image.w = clamp(+e.target.value||5,5,page().w*2.5); syncImagePanel(); draw(); scheduleAutosave();
-}));
-$("imgX").addEventListener("input", e=>{ if(state.image){state.image.x=+e.target.value||0; draw(); scheduleAutosave();} });
-$("imgY").addEventListener("input", e=>{ if(state.image){state.image.y=+e.target.value||0; draw(); scheduleAutosave();} });
 
-function syncImagePanel(){
-  if(!state.image) return;
-  $("imgW").value = $("imgWNum").value = round1(state.image.w);
-  $("imgX").value = round1(state.image.x);
-  $("imgY").value = round1(state.image.y);
+function placeUploadedImage(src,natW,natH){
+  const p=page();
+  /* replace currently selected image */
+  if(selection&&selection.type==="image"&&state.images[selection.idx]){
+    const im=state.images[selection.idx];
+    im.src=src; im.natW=natW; im.natH=natH;
+    if(isSig()) fitToColumn(im);
+    getImgEl(src); draw(); scheduleAutosave(); return;
+  }
+  if(isSig()){
+    const used=new Set(state.images.map(i=>i.col));
+    let col=-1;
+    for(let i=0;i<state.sigCount;i++){ if(!used.has(i)){ col=i; break; } }
+    if(col<0){ toast("All "+state.sigCount+" columns already have signatures. Select one and upload to replace it."); return; }
+    const im={src,natW,natH,x:0,y:0,w:10,col};
+    fitToColumn(im);
+    state.images.push(im);
+    select({type:"image",idx:state.images.length-1});
+  } else {
+    if(state.images.length){ toast("This tab uses a single image — select it and upload to replace."); return; }
+    const w=p.w, h=w*(natH/natW);
+    const im={src,natW,natH,w,x:0,y:isFooter()?p.h-h:0,col:0};
+    state.images.push(im);
+    select({type:"image",idx:0});
+  }
+  getImgEl(src); draw(); scheduleAutosave();
 }
+
+function fitToColumn(im){
+  const p=page(), n=state.sigCount, colW=p.w/n;
+  const ratio=im.natH/im.natW;
+  let w=colW*0.72;
+  const maxH=state.cutMm*0.55;
+  if(w*ratio>maxH) w=maxH/ratio;
+  im.w=w;
+  im.x=im.col*colW+(colW-w)/2;
+  im.y=state.cutMm*0.08;
+}
+
+function removeImage(idx){
+  state.images.splice(idx,1);
+  select(null); draw(); scheduleAutosave();
+}
+$("btnRemoveImg").onclick=()=>{ if(selection&&selection.type==="image") removeImage(selection.idx); };
+$("btnImgFullWidth").onclick=()=>{ withSelImage(im=>{
+  im.w=page().w; im.x=0;
+  if(isFooter()) im.y=page().h-imgBBoxMm(im).h;
+}); };
+$("btnImgCenter").onclick=()=>{ withSelImage(im=>{ im.x=(page().w-im.w)/2; }); };
+$("btnFitColumn").onclick=()=>{ withSelImage(im=>fitToColumn(im)); };
+$("imgCol").addEventListener("change", e=>{ withSelImage(im=>{ im.col=+e.target.value; fitToColumn(im); }); });
+["imgW","imgWNum"].forEach(id=> $(id).addEventListener("input", e=>{
+  withSelImage(im=>{ im.w=clamp(+e.target.value||5,5,page().w*2.5); });
+}));
+$("imgX").addEventListener("input", e=> withSelImage(im=>{ im.x=+e.target.value||0; }));
+$("imgY").addEventListener("input", e=> withSelImage(im=>{ im.y=+e.target.value||0; }));
+
+function withSelImage(fn){
+  if(!selection||selection.type!=="image") return;
+  const im=state.images[selection.idx]; if(!im) return;
+  fn(im); syncImagePanel(); draw(); scheduleAutosave();
+}
+function syncImagePanel(){
+  if(!selection||selection.type!=="image") return;
+  const im=state.images[selection.idx]; if(!im) return;
+  $("imgW").value=$("imgWNum").value=round1(im.w);
+  $("imgX").value=round1(im.x);
+  $("imgY").value=round1(im.y);
+  if(isSig()){
+    const sel=$("imgCol");
+    sel.innerHTML="";
+    for(let i=0;i<state.sigCount;i++){
+      const o=document.createElement("option"); o.value=i; o.textContent=i+1; sel.appendChild(o);
+    }
+    sel.value=im.col;
+  }
+}
+
+/* ---------- signature controls ---------- */
+$("sigCount").addEventListener("change", e=>{
+  state.sigCount=+e.target.value;
+  /* drop images that no longer fit, re-place the rest */
+  state.images=state.images.slice(0,state.sigCount);
+  state.images.forEach((im,i)=>{ im.col=i; fitToColumn(im); });
+  select(null); draw(); scheduleAutosave();
+});
+$("btnSigArrange").onclick=()=>{
+  state.images.forEach(im=>fitToColumn(im));
+  draw(); scheduleAutosave();
+};
+$("btnSigLabels").onclick=()=>{
+  const p=page(), n=state.sigCount, colW=p.w/n;
+  for(let i=0;i<n;i++){
+    state.texts.push({ id:state._seq++,
+      text:"Dr. Full Name\nMD, Consultant Pathologist",
+      x:colW*i+colW/2, y:state.cutMm*0.68,
+      sizePt:9, color:"#333333", bold:false, italic:false,
+      align:"center", font:"Arial, Helvetica, sans-serif" });
+  }
+  draw(); scheduleAutosave();
+};
 
 /* ---------- text handling ---------- */
 function getText(id){ return state.texts.find(t=>t.id===id); }
 function addText(x,y){
-  const t = { id:state._seq++, text:"Address line · Phone · Email · Website",
-              x: x!=null?x:page().w/2, y: y!=null?y:state.cutMm-10,
-              sizePt:10, color:"#333333", bold:false, italic:false,
-              align:"center", font:"Arial, Helvetica, sans-serif" };
+  const p=page();
+  let dx=p.w/2, dy;
+  if(isFooter()) dy=p.h-state.cutMm+5;
+  else if(isSig()) dy=state.cutMm*0.65;
+  else dy=state.cutMm-10;
+  const t={ id:state._seq++,
+    text: isSig()?"Dr. Full Name\nMD, Consultant Pathologist":"Address line · Phone · Email · Website",
+    x:x!=null?x:dx, y:y!=null?y:dy,
+    sizePt:isSig()?9:10, color:"#333333", bold:false, italic:false,
+    align:"center", font:"Arial, Helvetica, sans-serif" };
   state.texts.push(t);
-  select({type:"text", id:t.id});
+  select({type:"text",id:t.id});
   draw(); scheduleAutosave();
 }
-$("btnAddText").onclick = ()=> addText();
-$("btnDelText").onclick = ()=>{ if(selection&&selection.type==="text") deleteText(selection.id); };
-function deleteText(id){
-  state.texts = state.texts.filter(t=>t.id!==id);
-  select(null); draw(); scheduleAutosave();
-}
-$("textContent").addEventListener("input", e=>{ withSelText(t=>t.text=e.target.value); });
+$("btnAddText").onclick=()=>addText();
+$("btnDelText").onclick=()=>{ if(selection&&selection.type==="text") deleteText(selection.id); };
+function deleteText(id){ state.texts=state.texts.filter(t=>t.id!==id); select(null); draw(); scheduleAutosave(); }
+
+$("textContent").addEventListener("input", e=> withSelText(t=>t.text=e.target.value));
 ["textSize","textSizeNum"].forEach(id=> $(id).addEventListener("input", e=>{
-  withSelText(t=>t.sizePt = clamp(+e.target.value||10,4,96)); syncTextPanel();
+  withSelText(t=>t.sizePt=clamp(+e.target.value||10,4,96)); syncTextPanel();
 }));
 $("textColor").addEventListener("input", e=> withSelText(t=>t.color=e.target.value));
 $("textFont").addEventListener("change", e=> withSelText(t=>t.font=e.target.value));
-$("tBold").onclick   = ()=>{ withSelText(t=>t.bold=!t.bold); syncTextPanel(); };
-$("tItalic").onclick = ()=>{ withSelText(t=>t.italic=!t.italic); syncTextPanel(); };
-$("alL").onclick = ()=>{ setAlign("left"); };
-$("alC").onclick = ()=>{ setAlign("center"); };
-$("alR").onclick = ()=>{ setAlign("right"); };
+$("tBold").onclick=()=>{ withSelText(t=>t.bold=!t.bold); syncTextPanel(); };
+$("tItalic").onclick=()=>{ withSelText(t=>t.italic=!t.italic); syncTextPanel(); };
+$("alL").onclick=()=>setAlign("left");
+$("alC").onclick=()=>setAlign("center");
+$("alR").onclick=()=>setAlign("right");
 function setAlign(a){
   withSelText(t=>{
-    /* keep visual position stable when anchor changes */
-    const b = textBBoxMm(t);
-    t.align = a;
-    if(a==="left") t.x = b.x;
-    if(a==="center") t.x = b.x + b.w/2;
-    if(a==="right") t.x = b.x + b.w;
+    const b=textBBoxMm(t);
+    t.align=a;
+    if(a==="left") t.x=b.x;
+    if(a==="center") t.x=b.x+b.w/2;
+    if(a==="right") t.x=b.x+b.w;
   });
   syncTextPanel();
 }
 function withSelText(fn){
-  if(!selection || selection.type!=="text") return;
-  const t = getText(selection.id); if(!t) return;
+  if(!selection||selection.type!=="text") return;
+  const t=getText(selection.id); if(!t) return;
   fn(t); draw(); scheduleAutosave();
 }
 function syncTextPanel(){
-  if(!selection || selection.type!=="text") return;
-  const t = getText(selection.id); if(!t) return;
-  $("textContent").value = t.text;
-  $("textSize").value = $("textSizeNum").value = t.sizePt;
-  $("textColor").value = t.color;
-  $("textFont").value = t.font;
-  $("tBold").classList.toggle("on", t.bold);
-  $("tItalic").classList.toggle("on", t.italic);
-  $("alL").classList.toggle("on", t.align==="left");
-  $("alC").classList.toggle("on", t.align==="center");
-  $("alR").classList.toggle("on", t.align==="right");
+  if(!selection||selection.type!=="text") return;
+  const t=getText(selection.id); if(!t) return;
+  $("textContent").value=t.text;
+  $("textSize").value=$("textSizeNum").value=t.sizePt;
+  $("textColor").value=t.color;
+  $("textFont").value=t.font;
+  $("tBold").classList.toggle("on",t.bold);
+  $("tItalic").classList.toggle("on",t.italic);
+  $("alL").classList.toggle("on",t.align==="left");
+  $("alC").classList.toggle("on",t.align==="center");
+  $("alR").classList.toggle("on",t.align==="right");
 }
 
 /* ---------- selection ---------- */
 function select(sel){
-  selection = sel;
-  $("imagePanel").style.display = (sel && sel.type==="image") ? "" : "none";
-  $("textPanel").style.display  = (sel && sel.type==="text")  ? "" : "none";
-  if(sel && sel.type==="image") syncImagePanel();
-  if(sel && sel.type==="text")  syncTextPanel();
+  selection=sel;
+  $("imagePanel").style.display=(sel&&sel.type==="image")?"":"none";
+  $("textPanel").style.display=(sel&&sel.type==="text")?"":"none";
+  if(sel&&sel.type==="image") syncImagePanel();
+  if(sel&&sel.type==="text") syncTextPanel();
   draw();
 }
 
 /* ---------- cut / page / dpi ---------- */
 function setCut(mm){
-  state.cutMm = Math.round(mm*2)/2;
-  $("cutRange").value = $("cutNum").value = state.cutMm;
+  state.cutMm=Math.round(mm*2)/2;
+  $("cutRange").value=$("cutNum").value=state.cutMm;
 }
 ["cutRange","cutNum"].forEach(id=> $(id).addEventListener("input", e=>{
-  setCut(clamp(+e.target.value||45, 10, page().h-10)); draw(); scheduleAutosave();
+  setCut(clamp(+e.target.value||30,10,Math.min(150,page().h-10))); draw(); scheduleAutosave();
 }));
-$("pageSize").addEventListener("change", e=>{
-  state.pageSize = e.target.value; draw(); scheduleAutosave();
-});
-$("dpi").addEventListener("change", e=>{
-  state.dpi = +e.target.value; updateExportInfo(); scheduleAutosave();
-});
+$("pageSize").addEventListener("change", e=>{ state.pageSize=e.target.value; draw(); scheduleAutosave(); });
+$("dpi").addEventListener("change", e=>{ state.dpi=+e.target.value; updateExportInfo(); scheduleAutosave(); });
 function updateExportInfo(){
-  const p = page(), k = state.dpi/25.4;
-  $("exportInfo").textContent =
-    "Output: " + Math.round(p.w*k) + " × " + Math.round(state.cutMm*k) +
-    " px JPEG (" + p.label + " width @ " + state.dpi + " DPI)";
+  const p=page(), k=state.dpi/25.4;
+  if(isSig()){
+    const n=state.sigCount;
+    $("exportInfo").textContent =
+      "Output: "+n+" JPEG file"+(n>1?"s":"")+", one per column — each ~"+
+      Math.round(p.w*k/n)+" × "+Math.round(state.cutMm*k)+" px ("+p.label+" @ "+state.dpi+" DPI)";
+  } else {
+    $("exportInfo").textContent =
+      "Output: "+Math.round(p.w*k)+" × "+Math.round(state.cutMm*k)+" px JPEG ("+
+      p.label+" width @ "+state.dpi+" DPI, "+(isFooter()?"bottom":"top")+" strip)";
+  }
 }
 
 /* ---------- export ---------- */
-$("btnExport").onclick = ()=>{
-  if(!state.image && !state.texts.length){ toast("Nothing to export yet — add an image or text."); return; }
-  const wasSel = selection; select(null);
-  const k = state.dpi/25.4;
-  const oc = document.createElement("canvas");
-  oc.width = Math.round(page().w*k);
-  oc.height = Math.round(state.cutMm*k);
-  const c = oc.getContext("2d");
-  c.imageSmoothingQuality = "high";
-  renderScene(c, k);                       // page is drawn from top; canvas height crops at cut
-  const a = document.createElement("a");
-  const nm = ($("designName").value.trim()||"letterhead-header").replace(/[^\w\-]+/g,"_");
-  a.download = nm + "_" + oc.width + "x" + oc.height + ".jpg";
-  a.href = oc.toDataURL("image/jpeg", 0.92);
-  a.click();
+$("btnExport").onclick=()=>{
+  if(!state.images.length&&!state.texts.length){ toast("Nothing to export yet — add an image or text."); return; }
+  const wasSel=selection; select(null);
+  const k=state.dpi/25.4;
+  const nm=($("designName").value.trim()||"letterhead").replace(/[^\w\-]+/g,"_");
+  const dl=(canvas,fname,delay)=> setTimeout(()=>{
+    const a=document.createElement("a");
+    a.download=fname; a.href=canvas.toDataURL("image/jpeg",0.92); a.click();
+  },delay);
+
+  if(isSig()){
+    /* one file per column, cut at the column guides */
+    const n=state.sigCount, fullW=Math.round(page().w*k), h=Math.round(state.cutMm*k);
+    for(let i=0;i<n;i++){
+      const x0=Math.round(fullW*i/n), x1=Math.round(fullW*(i+1)/n);
+      const oc=document.createElement("canvas");
+      oc.width=x1-x0; oc.height=h;
+      const c=oc.getContext("2d");
+      c.imageSmoothingQuality="high";
+      c.translate(-x0,0);
+      renderScene(c,k);
+      dl(oc, nm+"_signature_"+(i+1)+"of"+n+"_"+oc.width+"x"+oc.height+".jpg", i*400);
+    }
+    toast(n+" signature JPEG"+(n>1?"s":"")+" downloading — one per column. Allow multiple downloads if your browser asks.");
+  } else {
+    const oc=document.createElement("canvas");
+    oc.width=Math.round(page().w*k);
+    oc.height=Math.round(state.cutMm*k);
+    const c=oc.getContext("2d");
+    c.imageSmoothingQuality="high";
+    if(isFooter()){ c.save(); c.translate(0,-Math.round((page().h-state.cutMm)*k)); renderScene(c,k); c.restore(); }
+    else renderScene(c,k);
+    dl(oc, nm+"_"+mode+"_"+oc.width+"x"+oc.height+".jpg", 0);
+    toast(mode[0].toUpperCase()+mode.slice(1)+" JPEG downloaded ("+oc.width+"×"+oc.height+" px).");
+  }
   select(wasSel);
-  toast("Header JPEG downloaded (" + oc.width + "×" + oc.height + " px).");
 };
 
 /* ---------- session storage ---------- */
-let autosaveTimer = null;
+let autosaveTimer=null;
 function scheduleAutosave(){
   clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(()=>{
-    try{ sessionStorage.setItem(SS_AUTOSAVE, JSON.stringify(state)); }
-    catch(err){ /* storage full — skip autosave silently */ }
-  }, 350);
+  autosaveTimer=setTimeout(()=>{
+    try{ sessionStorage.setItem(ssKey("lhs_autosave"), JSON.stringify(state)); }catch(err){}
+  },350);
 }
-function designs(){
-  try{ return JSON.parse(sessionStorage.getItem(SS_DESIGNS)||"{}"); }catch(e){ return {}; }
-}
-$("btnSave").onclick = ()=>{
-  const nm = $("designName").value.trim();
+function designs(){ try{ return JSON.parse(sessionStorage.getItem(ssKey("lhs_designs"))||"{}"); }catch(e){ return {}; } }
+
+$("btnSave").onclick=()=>{
+  const nm=$("designName").value.trim();
   if(!nm){ toast("Give the design a name first."); $("designName").focus(); return; }
-  const d = designs(); d[nm] = state;
-  try{
-    sessionStorage.setItem(SS_DESIGNS, JSON.stringify(d));
-    renderSaved(); toast("Saved “"+nm+"” for this session.");
-  }catch(err){
-    toast("Could not save — browser session storage is full. Try a smaller image.");
-  }
+  const d=designs(); d[nm]=state;
+  try{ sessionStorage.setItem(ssKey("lhs_designs"),JSON.stringify(d)); renderSaved(); toast("Saved “"+nm+"” ("+mode+")."); }
+  catch(err){ toast("Could not save — session storage is full. Try a smaller image."); }
 };
 function renderSaved(){
-  const d = designs(), box = $("savedList");
-  const names = Object.keys(d);
-  if(!names.length){ box.innerHTML = '<div class="empty">Nothing saved this session.</div>'; return; }
-  box.innerHTML = "";
+  const d=designs(), box=$("savedList"), names=Object.keys(d);
+  if(!names.length){ box.innerHTML='<div class="empty">Nothing saved this session.</div>'; return; }
+  box.innerHTML="";
   names.forEach(nm=>{
-    const el = document.createElement("div");
-    el.className = "savedItem";
-    const s = document.createElement("span"); s.className="nm"; s.textContent = nm;
-    const bL = document.createElement("button"); bL.textContent="Load";
-    bL.onclick = ()=>{ loadState(d[nm]); $("designName").value = nm; toast("Loaded “"+nm+"”."); };
-    const bD = document.createElement("button"); bD.textContent="✕"; bD.className="del"; bD.title="Delete";
-    bD.onclick = ()=>{ const dd=designs(); delete dd[nm]; sessionStorage.setItem(SS_DESIGNS, JSON.stringify(dd)); renderSaved(); };
+    const el=document.createElement("div"); el.className="savedItem";
+    const s=document.createElement("span"); s.className="nm"; s.textContent=nm;
+    const bL=document.createElement("button"); bL.textContent="Load";
+    bL.onclick=()=>{ loadState(d[nm]); $("designName").value=nm; toast("Loaded “"+nm+"”."); };
+    const bD=document.createElement("button"); bD.textContent="✕"; bD.className="del"; bD.title="Delete";
+    bD.onclick=()=>{ const dd=designs(); delete dd[nm]; sessionStorage.setItem(ssKey("lhs_designs"),JSON.stringify(dd)); renderSaved(); };
     el.append(s,bL,bD); box.appendChild(el);
   });
 }
-function loadState(s){
-  state = JSON.parse(JSON.stringify(s));
-  if(typeof state._seq!=="number") state._seq = (state.texts.reduce((m,t)=>Math.max(m,t.id),0)+1);
-  $("pageSize").value = state.pageSize; $("dpi").value = state.dpi;
-  setCut(state.cutMm);
-  select(null);
-  if(state.image) setImgEl(state.image.src, ()=>draw());
-  else { imgEl=null; draw(); }
-  scheduleAutosave();
+function normalizeState(s,m){
+  const f=freshState(m);
+  const out=Object.assign(f, s||{});
+  out.mode=m;
+  if(out.image && !Array.isArray(out.images)){ out.images=[Object.assign({col:0},out.image)]; }  /* migrate v1 */
+  delete out.image;
+  if(!Array.isArray(out.images)) out.images=[];
+  if(!Array.isArray(out.texts)) out.texts=[];
+  if(typeof out._seq!=="number") out._seq=out.texts.reduce((mx,t)=>Math.max(mx,t.id),0)+1;
+  return out;
 }
-$("btnNew").onclick = ()=>{
-  if((state.image||state.texts.length) && !confirm("Start a new design? Unsaved changes to the current canvas will be lost (saved designs are kept).")) return;
-  loadState(freshState()); $("designName").value="";
+function loadState(s){
+  stores[mode]=state=normalizeState(JSON.parse(JSON.stringify(s)),mode);
+  syncModeUI(); select(null);
+  state.images.forEach(im=>getImgEl(im.src));
+  draw(); scheduleAutosave();
+}
+$("btnNew").onclick=()=>{
+  if((state.images.length||state.texts.length)&&!confirm("Start a new "+mode+" design? Unsaved canvas changes are lost (saved designs are kept).")) return;
+  loadState(freshState(mode)); $("designName").value="";
 };
 
 /* ---------- utils ---------- */
@@ -607,21 +784,20 @@ function round1(v){ return Math.round(v*10)/10; }
 let toastTimer=null;
 function toast(msg){
   const t=$("toast"); t.textContent=msg; t.classList.add("show");
-  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2600);
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),3000);
 }
 
 /* ---------- init ---------- */
 window.addEventListener("resize", draw);
 (function init(){
-  const saved = sessionStorage.getItem(SS_AUTOSAVE);
-  if(saved){
-    try{ loadState(JSON.parse(saved)); }
-    catch(e){ loadState(freshState()); }
-  } else {
-    setCut(state.cutMm);
-    draw();
-  }
-  renderSaved();
+  MODES.forEach(m=>{
+    const raw=sessionStorage.getItem(ssKey("lhs_autosave",m)) ||
+              (m==="header"?sessionStorage.getItem("lhs_autosave"):null);   /* v1 key */
+    if(raw){ try{ stores[m]=normalizeState(JSON.parse(raw),m); }catch(e){} }
+  });
+  state=stores[mode];
+  state.images.forEach(im=>getImgEl(im.src));
+  syncModeUI(); renderSaved(); draw();
 })();
 
 })();
