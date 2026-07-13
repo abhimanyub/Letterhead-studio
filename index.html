@@ -77,6 +77,7 @@
   <button class="btn primary" id="btnUpload">Upload image</button>
   <input type="file" id="fileInput" accept="image/*" hidden>
   <button class="btn" id="btnAddText">+ Add text</button>
+  <button class="btn" id="btnAddLine">+ Add line</button>
   <label class="inline">Page
     <select id="pageSize">
       <option value="a4" selected>A4 (210 mm)</option>
@@ -90,9 +91,15 @@
       <option value="600">600</option>
     </select>
   </label>
+  <label class="inline">Format
+    <select id="fmt">
+      <option value="png" selected>PNG (sharp)</option>
+      <option value="jpeg">JPEG (smaller)</option>
+    </select>
+  </label>
   <span class="grow"></span>
   <button class="btn" id="btnNew">New</button>
-  <button class="btn primary" id="btnExport">Download JPEG</button>
+  <button class="btn primary" id="btnExport">Download PNG</button>
 </header>
 
 <main>
@@ -156,6 +163,41 @@
       </div>
     </div>
 
+    <div class="group" id="linePanel" style="display:none">
+      <h2>Selected line</h2>
+      <div class="row">
+        <label>Width</label>
+        <input type="range" id="lineW" min="1" max="260" step="0.5">
+        <input type="number" id="lineWNum" min="1" max="500" step="0.5"> <span class="hint">mm</span>
+      </div>
+      <div class="row">
+        <label>Thickness</label>
+        <input type="range" id="lineT" min="0.1" max="6" step="0.1">
+        <input type="number" id="lineTNum" min="0.1" max="20" step="0.1"> <span class="hint">mm</span>
+      </div>
+      <div class="row">
+        <label>X</label><input type="number" id="lnX" step="0.5"> <span class="hint">mm</span>
+        <label>Y</label><input type="number" id="lnY" step="0.5"> <span class="hint">mm</span>
+      </div>
+      <div class="row">
+        <label>Style</label>
+        <select id="lineStyle" style="flex:1">
+          <option value="solid">Solid</option>
+          <option value="dashed">Dashed</option>
+          <option value="dotted">Dotted</option>
+        </select>
+        <input type="color" id="lineColor">
+      </div>
+      <div class="row">
+        <button class="btn" id="btnLineFullWidth">Fit full page width</button>
+        <button class="btn" id="btnLineCenter">Center horizontally</button>
+      </div>
+      <div class="row">
+        <button class="btn danger" id="btnDelLine">Delete line</button>
+      </div>
+      <div class="hint">Drag the line to move it · drag either end handle to set its width.</div>
+    </div>
+
     <div class="group" id="textPanel" style="display:none">
       <h2>Selected text</h2>
       <textarea id="textContent" placeholder="Enter text…"></textarea>
@@ -202,7 +244,7 @@
 </main>
 
 <footer class="app">
-  Tips: drag to move · corner handle resizes image · double-click empty page to add text · arrow keys nudge (Shift = 5 mm) · Delete removes selected item
+  Tips: drag to move · corner handle resizes image · end handles resize a line · double-click empty page to add text · arrow keys nudge (Shift = 5 mm) · Delete removes selected item
 </footer>
 
 <div id="toast"></div>
@@ -230,6 +272,8 @@ function freshState(mode){
     sigCount: 3,
     images:[],            // {src,natW,natH,x,y,w,col}
     texts:[],             // {id,text,x,y,sizePt,color,bold,italic,align,font}
+    lines:[],             // {id,x,y,w,thickMm,color,style}  y = vertical centre of the rule
+    format:"png",
     _seq:1
   };
 }
@@ -237,7 +281,7 @@ const stores = {};
 MODES.forEach(m=> stores[m]=freshState(m));
 let mode = "header";
 let state = stores[mode];
-let selection = null;     // {type:'image', idx} | {type:'text', id}
+let selection = null;     // {type:'image', idx} | {type:'text', id} | {type:'line', id}
 let ppm = 3;
 
 const page = () => PAGES[state.pageSize];
@@ -277,6 +321,15 @@ function textBBoxMm(t){
   return {x:x0,y:t.y,w:m.w,h:m.h};
 }
 function imgBBoxMm(im){ return {x:im.x, y:im.y, w:im.w, h:im.w*(im.natH/im.natW)}; }
+/* a line is stored with y = its vertical centre, so the bbox straddles it */
+function lineBBoxMm(l){ return {x:l.x, y:l.y-l.thickMm/2, w:l.w, h:l.thickMm}; }
+/* dash lengths are defined in mm so they scale with DPI, not with pixels */
+function lineDash(l,k){
+  const t=Math.max(l.thickMm,0.1);
+  if(l.style==="dashed") return [Math.max(t*4,2)*k, Math.max(t*3,1.4)*k];
+  if(l.style==="dotted") return [0, Math.max(t*2.2,0.8)*k];
+  return [];
+}
 
 /* ---------- rendering (shared preview/export) ---------- */
 function renderScene(c,k){
@@ -285,6 +338,15 @@ function renderScene(c,k){
   for(const im of state.images){
     const el=getImgEl(im.src);
     if(el.complete && el.naturalWidth){ const b=imgBBoxMm(im); c.drawImage(el,b.x*k,b.y*k,b.w*k,b.h*k); }
+  }
+  for(const l of state.lines){
+    c.save();
+    c.strokeStyle=l.color;
+    c.lineWidth=Math.max(l.thickMm*k, 0.75);
+    c.setLineDash(lineDash(l,k));
+    c.lineCap = l.style==="dotted" ? "round" : "butt";
+    c.beginPath(); c.moveTo(l.x*k, l.y*k); c.lineTo((l.x+l.w)*k, l.y*k); c.stroke();
+    c.restore();
   }
   c.textBaseline="top";
   for(const t of state.texts){
@@ -340,8 +402,10 @@ function draw(){
 
   /* selection */
   if(selection){
-    const b = selection.type==="image" ? (state.images[selection.idx] && imgBBoxMm(state.images[selection.idx]))
-                                       : (getText(selection.id) && textBBoxMm(getText(selection.id)));
+    let b=null;
+    if(selection.type==="image") b = state.images[selection.idx] && imgBBoxMm(state.images[selection.idx]);
+    else if(selection.type==="line"){ const l=getLine(selection.id); b = l && lineBBoxMm(l); }
+    else { const t=getText(selection.id); b = t && textBBoxMm(t); }
     if(b){
       ctx.save();
       ctx.strokeStyle="#1267d2"; ctx.lineWidth=1.5*DPR; ctx.setLineDash([6,4]);
@@ -351,11 +415,17 @@ function draw(){
         ctx.fillStyle="#1267d2"; const s=9*DPR;
         ctx.fillRect((b.x+b.w)*ppm-s/2,(b.y+b.h)*ppm-s/2,s,s);
       }
+      if(selection.type==="line"){
+        const l=getLine(selection.id), s=9*DPR, cy=l.y*ppm;
+        ctx.fillStyle="#1267d2";
+        ctx.fillRect(l.x*ppm-s/2, cy-s/2, s, s);              /* left end  */
+        ctx.fillRect((l.x+l.w)*ppm-s/2, cy-s/2, s, s);        /* right end */
+      }
       ctx.restore();
     }
   }
 
-  dropHint.style.display = (state.images.length||state.texts.length) ? "none" : "flex";
+  dropHint.style.display = (state.images.length||state.texts.length||state.lines.length) ? "none" : "flex";
   updateExportInfo();
 }
 function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
@@ -370,11 +440,23 @@ function mouseMm(e){
 }
 function hitTest(m){
   const tol = 8/(ppm/DPR);
-  if(Math.abs(m.y-lineY())<tol) return {kind:"cut"};
   if(selection && selection.type==="image" && state.images[selection.idx]){
     const b=imgBBoxMm(state.images[selection.idx]);
     if(Math.abs(m.x-(b.x+b.w))<tol && Math.abs(m.y-(b.y+b.h))<tol) return {kind:"scale"};
   }
+  /* end handles of the selected line take priority over everything */
+  if(selection && selection.type==="line"){
+    const l=getLine(selection.id);
+    if(l && Math.abs(m.y-l.y) < l.thickMm/2+tol){
+      if(Math.abs(m.x-(l.x+l.w))<tol) return {kind:"lineScale", id:l.id, end:"right"};
+      if(Math.abs(m.x-l.x)<tol)       return {kind:"lineScale", id:l.id, end:"left"};
+    }
+  }
+  for(let i=state.lines.length-1;i>=0;i--){
+    const l=state.lines[i];
+    if(Math.abs(m.y-l.y) < l.thickMm/2+tol && m.x>=l.x-tol && m.x<=l.x+l.w+tol) return {kind:"line", id:l.id};
+  }
+  if(Math.abs(m.y-lineY())<tol) return {kind:"cut"};
   for(let i=state.texts.length-1;i>=0;i--){
     const t=state.texts[i], b=textBBoxMm(t);
     if(m.x>=b.x-1&&m.x<=b.x+b.w+1&&m.y>=b.y-1&&m.y<=b.y+b.h+1) return {kind:"text", id:t.id};
@@ -392,6 +474,12 @@ cv.addEventListener("pointerdown", e=>{
   if(!h){ select(null); return; }
   if(h.kind==="cut"){ drag={mode:"cut"}; return; }
   if(h.kind==="scale"){ const im=state.images[selection.idx]; drag={mode:"scale", idx:selection.idx, startW:im.w, startX:m.x}; return; }
+  if(h.kind==="lineScale"){
+    const l=getLine(h.id);
+    drag={mode:"lineScale", id:h.id, end:h.end, startW:l.w, startX:l.x, startM:m.x};
+    return;
+  }
+  if(h.kind==="line"){ const l=getLine(h.id); select({type:"line",id:h.id}); drag={mode:"line",id:h.id,dx:m.x-l.x,dy:m.y-l.y}; return; }
   if(h.kind==="text"){ const t=getText(h.id); select({type:"text",id:h.id}); drag={mode:"text",id:h.id,dx:m.x-t.x,dy:m.y-t.y}; return; }
   if(h.kind==="image"){ const im=state.images[h.idx]; select({type:"image",idx:h.idx}); drag={mode:"image",idx:h.idx,dx:m.x-im.x,dy:m.y-im.y}; }
 });
@@ -399,7 +487,11 @@ cv.addEventListener("pointermove", e=>{
   const m=mouseMm(e);
   if(!drag){
     const h=hitTest(m);
-    cv.style.cursor = !h ? "default" : h.kind==="cut" ? "ns-resize" : h.kind==="scale" ? "nwse-resize" : "move";
+    cv.style.cursor = !h ? "default"
+      : h.kind==="cut" ? "ns-resize"
+      : h.kind==="scale" ? "nwse-resize"
+      : h.kind==="lineScale" ? "ew-resize"
+      : "move";
     return;
   }
   if(drag.mode==="cut"){
@@ -409,6 +501,17 @@ cv.addEventListener("pointermove", e=>{
   else if(drag.mode==="image"){ const im=state.images[drag.idx]; im.x=m.x-drag.dx; im.y=m.y-drag.dy; syncImagePanel(); }
   else if(drag.mode==="scale"){ const im=state.images[drag.idx]; im.w=clamp(drag.startW+(m.x-drag.startX),5,page().w*2.5); syncImagePanel(); }
   else if(drag.mode==="text"){ const t=getText(drag.id); t.x=m.x-drag.dx; t.y=m.y-drag.dy; }
+  else if(drag.mode==="line"){ const l=getLine(drag.id); l.x=m.x-drag.dx; l.y=m.y-drag.dy; syncLinePanel(); }
+  else if(drag.mode==="lineScale"){
+    const l=getLine(drag.id), d=m.x-drag.startM;
+    if(drag.end==="right") l.w=clamp(drag.startW+d, 1, page().w*2.5);
+    else { /* dragging the left end keeps the right end pinned */
+      const right=drag.startX+drag.startW;
+      const nx=clamp(drag.startX+d, right-page().w*2.5, right-1);
+      l.x=nx; l.w=right-nx;
+    }
+    syncLinePanel();
+  }
   draw(); scheduleAutosave();
 });
 const endDrag=()=>{drag=null;};
@@ -427,6 +530,7 @@ document.addEventListener("keydown", e=>{
   const step=e.shiftKey?5:0.5;
   const mv=(dx,dy)=>{
     if(selection.type==="image"){ const im=state.images[selection.idx]; if(im){im.x+=dx; im.y+=dy; syncImagePanel();} }
+    else if(selection.type==="line"){ const l=getLine(selection.id); if(l){l.x+=dx; l.y+=dy; syncLinePanel();} }
     else { const t=getText(selection.id); if(t){t.x+=dx; t.y+=dy;} }
     draw(); scheduleAutosave(); e.preventDefault();
   };
@@ -436,6 +540,7 @@ document.addEventListener("keydown", e=>{
   else if(e.key==="ArrowDown") mv(0,step);
   else if(e.key==="Delete"||e.key==="Backspace"){
     if(selection.type==="text") deleteText(selection.id);
+    else if(selection.type==="line") deleteLine(selection.id);
     else removeImage(selection.idx);
     e.preventDefault();
   }
@@ -461,6 +566,7 @@ function switchMode(m){
 function syncModeUI(){
   $("pageSize").value=state.pageSize;
   $("dpi").value=state.dpi;
+  syncFormatUI();
   setCut(state.cutMm);
   $("sigPanel").style.display = isSig()?"":"none";
   $("sigCount").value=state.sigCount;
@@ -600,6 +706,57 @@ $("btnSigLabels").onclick=()=>{
   draw(); scheduleAutosave();
 };
 
+/* ---------- line (separator / rule) handling ---------- */
+function getLine(id){ return state.lines.find(l=>l.id===id); }
+function addLine(x,y){
+  const p=page();
+  /* default: a rule 80% of the page width, sat just under the content of the strip */
+  const w=p.w*0.8;
+  let dy;
+  if(isFooter()) dy=p.h-state.cutMm+4;
+  else if(isSig()) dy=state.cutMm*0.55;
+  else dy=state.cutMm-8;
+  const l={ id:state._seq++,
+    x: x!=null ? x-w/2 : (p.w-w)/2,
+    y: y!=null ? y : dy,
+    w, thickMm:0.4, color:"#333333", style:"solid" };
+  state.lines.push(l);
+  select({type:"line",id:l.id});
+  draw(); scheduleAutosave();
+}
+$("btnAddLine").onclick=()=>addLine();
+$("btnDelLine").onclick=()=>{ if(selection&&selection.type==="line") deleteLine(selection.id); };
+function deleteLine(id){ state.lines=state.lines.filter(l=>l.id!==id); select(null); draw(); scheduleAutosave(); }
+
+["lineW","lineWNum"].forEach(id=> $(id).addEventListener("input", e=>{
+  withSelLine(l=>{ l.w=clamp(+e.target.value||1, 1, page().w*2.5); });
+}));
+["lineT","lineTNum"].forEach(id=> $(id).addEventListener("input", e=>{
+  withSelLine(l=>{ l.thickMm=clamp(+e.target.value||0.4, 0.1, 20); });
+}));
+$("lnX").addEventListener("input", e=> withSelLine(l=>{ l.x=+e.target.value||0; }));
+$("lnY").addEventListener("input", e=> withSelLine(l=>{ l.y=+e.target.value||0; }));
+$("lineColor").addEventListener("input", e=> withSelLine(l=>{ l.color=e.target.value; }));
+$("lineStyle").addEventListener("change", e=> withSelLine(l=>{ l.style=e.target.value; }));
+$("btnLineFullWidth").onclick=()=> withSelLine(l=>{ l.w=page().w; l.x=0; });
+$("btnLineCenter").onclick=()=> withSelLine(l=>{ l.x=(page().w-l.w)/2; });
+
+function withSelLine(fn){
+  if(!selection||selection.type!=="line") return;
+  const l=getLine(selection.id); if(!l) return;
+  fn(l); syncLinePanel(); draw(); scheduleAutosave();
+}
+function syncLinePanel(){
+  if(!selection||selection.type!=="line") return;
+  const l=getLine(selection.id); if(!l) return;
+  $("lineW").value=$("lineWNum").value=round1(l.w);
+  $("lineT").value=$("lineTNum").value=l.thickMm;
+  $("lnX").value=round1(l.x);
+  $("lnY").value=round1(l.y);
+  $("lineColor").value=l.color;
+  $("lineStyle").value=l.style;
+}
+
 /* ---------- text handling ---------- */
 function getText(id){ return state.texts.find(t=>t.id===id); }
 function addText(x,y){
@@ -666,8 +823,10 @@ function select(sel){
   selection=sel;
   $("imagePanel").style.display=(sel&&sel.type==="image")?"":"none";
   $("textPanel").style.display=(sel&&sel.type==="text")?"":"none";
+  $("linePanel").style.display=(sel&&sel.type==="line")?"":"none";
   if(sel&&sel.type==="image") syncImagePanel();
   if(sel&&sel.type==="text") syncTextPanel();
+  if(sel&&sel.type==="line") syncLinePanel();
   draw();
 }
 
@@ -681,29 +840,42 @@ function setCut(mm){
 }));
 $("pageSize").addEventListener("change", e=>{ state.pageSize=e.target.value; draw(); scheduleAutosave(); });
 $("dpi").addEventListener("change", e=>{ state.dpi=+e.target.value; updateExportInfo(); scheduleAutosave(); });
+$("fmt").addEventListener("change", e=>{ state.format=e.target.value; syncFormatUI(); updateExportInfo(); scheduleAutosave(); });
+
+/* PNG is lossless, so text and hairline rules stay crisp. JPEG is lossy: its 8x8 DCT
+   blocks smear exactly the high-contrast edges a letterhead is made of. */
+function fmtInfo(){
+  return state.format==="jpeg"
+    ? {mime:"image/jpeg", q:0.92, ext:"jpg", label:"JPEG"}
+    : {mime:"image/png",  q:undefined, ext:"png", label:"PNG"};
+}
+function syncFormatUI(){
+  $("fmt").value=state.format;
+  $("btnExport").textContent="Download "+fmtInfo().label;
+}
 function updateExportInfo(){
-  const p=page(), k=state.dpi/25.4;
+  const p=page(), k=state.dpi/25.4, F=fmtInfo().label;
   if(isSig()){
     const n=state.sigCount;
     $("exportInfo").textContent =
-      "Output: "+n+" JPEG file"+(n>1?"s":"")+", one per column — each ~"+
+      "Output: "+n+" "+F+" file"+(n>1?"s":"")+", one per column — each ~"+
       Math.round(p.w*k/n)+" × "+Math.round(state.cutMm*k)+" px ("+p.label+" @ "+state.dpi+" DPI)";
   } else {
     $("exportInfo").textContent =
-      "Output: "+Math.round(p.w*k)+" × "+Math.round(state.cutMm*k)+" px JPEG ("+
+      "Output: "+Math.round(p.w*k)+" × "+Math.round(state.cutMm*k)+" px "+F+" ("+
       p.label+" width @ "+state.dpi+" DPI, "+(isFooter()?"bottom":"top")+" strip)";
   }
 }
 
 /* ---------- export ---------- */
 $("btnExport").onclick=()=>{
-  if(!state.images.length&&!state.texts.length){ toast("Nothing to export yet — add an image or text."); return; }
+  if(!state.images.length&&!state.texts.length&&!state.lines.length){ toast("Nothing to export yet — add an image, text or a line."); return; }
   const wasSel=selection; select(null);
-  const k=state.dpi/25.4;
+  const k=state.dpi/25.4, F=fmtInfo();
   const nm=($("designName").value.trim()||"letterhead").replace(/[^\w\-]+/g,"_");
   const dl=(canvas,fname,delay)=> setTimeout(()=>{
     const a=document.createElement("a");
-    a.download=fname; a.href=canvas.toDataURL("image/jpeg",0.92); a.click();
+    a.download=fname; a.href=canvas.toDataURL(F.mime,F.q); a.click();
   },delay);
 
   if(isSig()){
@@ -717,9 +889,9 @@ $("btnExport").onclick=()=>{
       c.imageSmoothingQuality="high";
       c.translate(-x0,0);
       renderScene(c,k);
-      dl(oc, nm+"_signature_"+(i+1)+"of"+n+"_"+oc.width+"x"+oc.height+".jpg", i*400);
+      dl(oc, nm+"_signature_"+(i+1)+"of"+n+"_"+oc.width+"x"+oc.height+"."+F.ext, i*400);
     }
-    toast(n+" signature JPEG"+(n>1?"s":"")+" downloading — one per column. Allow multiple downloads if your browser asks.");
+    toast(n+" signature "+F.label+(n>1?"s":"")+" downloading — one per column. Allow multiple downloads if your browser asks.");
   } else {
     const oc=document.createElement("canvas");
     oc.width=Math.round(page().w*k);
@@ -728,8 +900,8 @@ $("btnExport").onclick=()=>{
     c.imageSmoothingQuality="high";
     if(isFooter()){ c.save(); c.translate(0,-Math.round((page().h-state.cutMm)*k)); renderScene(c,k); c.restore(); }
     else renderScene(c,k);
-    dl(oc, nm+"_"+mode+"_"+oc.width+"x"+oc.height+".jpg", 0);
-    toast(mode[0].toUpperCase()+mode.slice(1)+" JPEG downloaded ("+oc.width+"×"+oc.height+" px).");
+    dl(oc, nm+"_"+mode+"_"+oc.width+"x"+oc.height+"."+F.ext, 0);
+    toast(mode[0].toUpperCase()+mode.slice(1)+" "+F.label+" downloaded ("+oc.width+"×"+oc.height+" px).");
   }
   select(wasSel);
 };
@@ -773,7 +945,21 @@ function normalizeState(s,m){
   delete out.image;
   if(!Array.isArray(out.images)) out.images=[];
   if(!Array.isArray(out.texts)) out.texts=[];
-  if(typeof out._seq!=="number") out._seq=out.texts.reduce((mx,t)=>Math.max(mx,t.id),0)+1;
+  if(!Array.isArray(out.lines)) out.lines=[];   /* designs saved before lines existed */
+  out.lines=out.lines.map(l=>({
+    id: l.id, x:+l.x||0, y:+l.y||0,
+    w: clamp(+l.w||1, 1, 2000),
+    thickMm: clamp(+l.thickMm||0.4, 0.1, 20),
+    color: l.color||"#333333",
+    style: ["solid","dashed","dotted"].includes(l.style) ? l.style : "solid"
+  }));
+  if(out.format!=="jpeg") out.format="png";
+  if(typeof out._seq!=="number"){
+    const ids=out.texts.map(t=>t.id).concat(out.lines.map(l=>l.id)).filter(n=>typeof n==="number");
+    out._seq=(ids.length?Math.max.apply(null,ids):0)+1;
+  }
+  /* make sure restored lines can never collide with newly-minted ids */
+  out.lines.forEach(l=>{ if(typeof l.id!=="number"){ l.id=out._seq++; } else if(l.id>=out._seq){ out._seq=l.id+1; } });
   return out;
 }
 function loadState(s){
@@ -783,7 +969,7 @@ function loadState(s){
   draw(); scheduleAutosave();
 }
 $("btnNew").onclick=()=>{
-  if((state.images.length||state.texts.length)&&!confirm("Start a new "+mode+" design? Unsaved canvas changes are lost (saved designs are kept).")) return;
+  if((state.images.length||state.texts.length||state.lines.length)&&!confirm("Start a new "+mode+" design? Unsaved canvas changes are lost (saved designs are kept).")) return;
   loadState(freshState(mode)); $("designName").value="";
 };
 
